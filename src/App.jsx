@@ -141,9 +141,11 @@ function HomePage() {
 
 // --- Budget Page Component ---
 function BudgetPage({ budgetPlan, setBudgetPlan }) {
-    const [income, setIncome] = useState('');
-    const [essentialExpenses, setEssentialExpenses] = useState('');
-    const [savingsGoalPercentage, setSavingsGoalPercentage] = useState('');
+    // const [income, setIncome] = useState('');
+    // const [essentialExpenses, setEssentialExpenses] = useState('');
+    // const [savingsGoalPercentage, setSavingsGoalPercentage] = useState('');
+
+
 
     const handleGenerateBudget = (data) => {
         const { income, essentialExpenses, savingsGoalPercentage } = data;
