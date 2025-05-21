@@ -4,9 +4,9 @@ import joblib
 import numpy as np
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all domains
+CORS(app)  
 
-# Load the trained model
+
 model = joblib.load('budget_model.joblib')
 
 @app.route('/predict-budget', methods=['POST'])
@@ -16,15 +16,15 @@ def predict_budget():
     essential_expenses = float(data.get('essentialExpenses', 0))
     savings_goal_percentage = float(data.get('savingsGoalPercentage', 0))
 
-    # Prepare input for model
+    
     input_features = np.array([[income, essential_expenses, savings_goal_percentage]])
 
-    # Predict savings_amount and discretionary
+
     prediction = model.predict(input_features)[0]
     savings_amount = prediction[0]
     discretionary = prediction[1]
 
-    # Generate insights and warnings
+
     spending_warning = None
     savings_suggestion = None
     insight = ''
