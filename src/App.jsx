@@ -3,6 +3,16 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, NavLink } from 'react-router-dom';
 import { FaHome, FaCalculator, FaPiggyBank, FaCog, FaSun, FaMoon, FaRupeeSign, FaChartLine, FaLightbulb, FaInfoCircle, FaExclamationTriangle, FaShoppingCart, FaMugHot, FaBell, FaSync } from 'react-icons/fa';
 import './styles/animations.css';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 // --- Theme Context ---
 const ThemeContext = createContext();
@@ -139,59 +149,48 @@ function HomePage() {
     );
 }
 
-// --- Budget Page Component ---
 function BudgetPage({ budgetPlan, setBudgetPlan }) {
-    // const [income, setIncome] = useState('');
-    // const [essentialExpenses, setEssentialExpenses] = useState('');
-    // const [savingsGoalPercentage, setSavingsGoalPercentage] = useState('');
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
 
+    const handleGenerateBudget = async (data) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await fetch('http://localhost:5000/predict-budget', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    income: parseFloat(data.income),
+                    essentialExpenses: parseFloat(data.essentialExpenses),
+                    savingsGoalPercentage: parseFloat(data.savingsGoalPercentage),
+                }),
+            });
 
+            if (!response.ok) {
+                throw new Error('Failed to fetch budget plan from ML model API');
+            }
 
-    const handleGenerateBudget = (data) => {
-        const { income, essentialExpenses, savingsGoalPercentage } = data;
-        const incomeNum = parseFloat(income);
-        const essentialsNum = parseFloat(essentialExpenses);
-        const savingsPercent = parseFloat(savingsGoalPercentage);
+            const result = await response.json();
 
-        // Calculate budget allocations
-        const savingsAmount = (incomeNum * savingsPercent) / 100;
-        const discretionary = incomeNum - essentialsNum - savingsAmount;
-
-        // Generate insights and warnings
-        let spendingWarning = null;
-        let savingsSuggestion = null;
-        let insight = '';
-
-        if (essentialsNum > incomeNum * 0.6) {
-            spendingWarning = 'Your essential expenses are quite high. Consider reviewing your fixed costs.';
+            // Assuming the API returns the budget plan in the following format:
+            // { income, essentials, savings, discretionary, savingsPercentage, spendingWarning, savingsSuggestion, insight }
+            setBudgetPlan(result);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-
-        if (savingsPercent < 15) {
-            savingsSuggestion = 'Consider increasing your savings rate to at least 15% for better financial security.';
-        }
-
-        if (discretionary < incomeNum * 0.2) {
-            insight = 'Your discretionary spending is limited. Look for ways to reduce essential expenses to have more flexibility.';
-        } else {
-            insight = 'Great balance! You have enough for essentials, savings, and discretionary spending.';
-        }
-
-        setBudgetPlan({
-            income: incomeNum,
-            essentials: essentialsNum,
-            savings: savingsAmount,
-            discretionary: discretionary,
-            savingsPercentage: savingsPercent,
-            spendingWarning,
-            savingsSuggestion,
-            insight
-        });
     };
 
     return (
         <div className="space-y-8 animate-slide-in">
             <InputForm onGenerateBudget={handleGenerateBudget} />
-            {budgetPlan && <BudgetDisplay budgetPlan={budgetPlan} />}
+            {loading && <p>Loading budget plan from ML model...</p>}
+            {error && <p className="text-red-600">Error: {error}</p>}
+            {budgetPlan && !loading && <BudgetDisplay budgetPlan={budgetPlan} />}
         </div>
     );
 }
@@ -306,7 +305,6 @@ function BudgetDisplay({ budgetPlan }) {
     );
 }
 
-// --- Savings Page Component ---
 function SavingsPage({ budgetPlan }) {
     if (!budgetPlan || budgetPlan.income <= 0) {
         return (
@@ -341,6 +339,16 @@ function SavingsPage({ budgetPlan }) {
         }
         
         return { years, amount: Math.round(amount) };
+    });
+
+    // Prepare data for chart
+    const chartData = projections.map(p => {
+        const compound = compoundProjections.find(cp => cp.years === p.years);
+        return {
+            year: p.years,
+            Simple: p.amount,
+            Compound: compound ? compound.amount : 0,
+        };
     });
 
     return (
@@ -395,14 +403,17 @@ function SavingsPage({ budgetPlan }) {
             {/* Chart Section */}
             <section className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 animate-slide-in" style={{ animationDelay: '0.6s' }}>
                 <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-white">Visual Growth</h3>
-                <div className="h-64 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-800 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-400/10 dark:to-indigo-400/10 animate-pulse-slow"></div>
-                    <div className="relative z-10 text-center p-4">
-                        <FaChartLine className="text-4xl mx-auto mb-2 text-blue-500 dark:text-blue-400 animate-float" />
-                        <p>Interactive chart visualization coming soon!</p>
-                        <p className="text-sm mt-2">We're working on adding beautiful, interactive charts to help you visualize your financial growth.</p>
-                    </div>
-                </div>
+                <ResponsiveContainer width="100%" height={256}>
+                    <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottomRight', offset: -5 }} />
+                        <YAxis label={{ value: 'Amount (₹)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <Legend verticalAlign="top" height={36} />
+                        <Line type="monotone" dataKey="Simple" stroke="#3182ce" strokeWidth={3} activeDot={{ r: 8 }} />
+                        <Line type="monotone" dataKey="Compound" stroke="#38a169" strokeWidth={3} />
+                    </LineChart>
+                </ResponsiveContainer>
             </section>
         </div>
     );
